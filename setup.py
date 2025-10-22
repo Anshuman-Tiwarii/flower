@@ -47,7 +47,7 @@ classifiers = [s.strip() for s in classes.split('\n') if s]
 setup(
     name='flower',
     version=get_package_version(),
-    description='Celery Flower',
+    description='Celery Flower with Enhanced Task Monitoring',
     long_description=open('README.rst').read(),
     long_description_content_type="text/x-rst",
     author='Mher Movsisyan',
