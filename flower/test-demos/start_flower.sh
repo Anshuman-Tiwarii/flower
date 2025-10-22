@@ -12,4 +12,4 @@ source ../flower-env/bin/activate
 # Start Flower
 exec celery -A example_enhanced_tasks flower \
     --broker=redis://localhost:6379/0 \
-    --port=5556
+    --port=5555

@@ -55,7 +55,6 @@ handlers = [
     (r"/api/task/([^/]+)/progress", enhanced_monitoring.TaskProgressHandler),
     (r"/api/task/([^/]+)/hierarchy", enhanced_monitoring.TaskHierarchyHandler),
     (r"/api/task/([^/]+)/failure-analysis", enhanced_monitoring.TaskFailureAnalysisHandler),
-    (r"/api/task/([^/]+)/custom-events", enhanced_monitoring.TaskCustomEventsHandler),
     (r"/api/task/([^/]+)/metadata", enhanced_monitoring.TaskMetadataHandler),
     # Metrics
     (r"/metrics", monitor.Metrics),

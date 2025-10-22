@@ -8,6 +8,7 @@
   	<link rel="stylesheet" href="{{ static_url('css/bootstrap.min.css') }}">
 	  <link rel="stylesheet" href="{{ static_url('css/datatables-1.13.4.min.css') }}">
 	  <link href="{{ static_url('css/flower.css') }}" rel="stylesheet">
+	  <link href="{{ static_url('css/enhanced-monitoring.css') }}" rel="stylesheet">
   </head>
   <body class="m-2">
     {% block navbar %}
@@ -28,7 +29,13 @@
     <script src="{{ static_url('js/moment-2.29.4.min.js') }}"></script>
     <script src="{{ static_url('js/moment-timezone-with-data-2.29.4.min.js') }}"></script>
 	  <script src="{{ static_url('js/flower.js') }}"></script>
-	  <script src="{{ static_url('js/enhanced-monitoring.js') }}"></script>
+	  
+	  <!-- Enhanced Monitoring Modules -->
+	  <script src="{{ static_url('js/enhanced-monitoring/core.js') }}"></script>
+	  <script src="{{ static_url('js/enhanced-monitoring/progress.js') }}"></script>
+	  <script src="{{ static_url('js/enhanced-monitoring/hierarchy.js') }}"></script>
+	  <script src="{{ static_url('js/enhanced-monitoring/failure-analysis.js') }}"></script>
+	  <script src="{{ static_url('js/enhanced-monitoring-main.js') }}"></script>
 
     {% block extra_scripts %}
     {% end %}

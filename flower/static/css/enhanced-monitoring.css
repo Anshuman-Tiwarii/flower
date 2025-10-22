@@ -1,0 +1,237 @@
+/*
+ * Enhanced Task Monitoring Styles
+ * Modular CSS for progress tracking, hierarchy visualization, and failure analysis
+ */
+
+/* ==== PROGRESS MONITORING STYLES ==== */
+.task-progress-mini {
+    width: 100px;
+    height: 8px;
+    background: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+    display: inline-block;
+    margin-left: 10px;
+    vertical-align: middle;
+}
+
+.task-progress-mini .progress-fill {
+    height: 100%;
+    background: #007bff;
+    transition: width 0.3s ease;
+    border-radius: 4px;
+}
+
+/* ==== HIERARCHY VISUALIZATION STYLES ==== */
+.task-tree {
+    font-family: monospace;
+    line-height: 1.6;
+    overflow-x: auto;
+    max-width: 100%;
+    white-space: nowrap;
+}
+
+.task-node {
+    margin: 5px 0;
+    padding: 8px;
+    border-left: 3px solid #ccc;
+    background: #f8f9fa;
+    border-radius: 3px;
+    position: relative;
+    white-space: normal;
+    word-wrap: break-word;
+}
+
+.task-node.depth-0 {
+    padding-left: 8px;
+    border-color: #007bff;
+}
+
+.task-node.depth-1 {
+    padding-left: 24px;
+    border-color: #28a745;
+}
+
+.task-node.depth-2 {
+    padding-left: 40px;
+    border-color: #ffc107;
+}
+
+.task-node.depth-3 {
+    padding-left: 56px;
+    border-color: #dc3545;
+}
+
+.task-node.state-SUCCESS {
+    background-color: #d4edda;
+}
+
+.task-node.state-FAILURE {
+    background-color: #f8d7da;
+}
+
+.task-node.state-STARTED {
+    background-color: #d1ecf1;
+}
+
+.task-node:hover {
+    background-color: #e9ecef;
+}
+
+.task-node.expandable {
+    cursor: pointer;
+}
+
+.task-node.expandable:hover {
+    background-color: #e9ecef;
+}
+
+.expand-icon {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    margin-right: 8px;
+    text-align: center;
+    cursor: pointer;
+    font-size: 12px;
+    vertical-align: middle;
+}
+
+.expand-icon:before {
+    content: "▶";
+    color: #6c757d;
+}
+
+.expand-icon.expanded:before {
+    content: "▼";
+    color: #007bff;
+}
+
+.task-children {
+    display: none;
+    border-left: 1px dashed #dee2e6;
+    margin-left: 12px;
+    padding-left: 4px;
+}
+
+.task-children.expanded {
+    display: block;
+}
+
+.hierarchy-controls {
+    border-bottom: 1px solid #dee2e6;
+    padding-bottom: 10px;
+}
+
+.task-node small {
+    word-break: break-all;
+    overflow-wrap: break-word;
+}
+
+.task-node .badge {
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.task-node strong {
+    word-break: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
+    display: inline-block;
+}
+
+/* ==== FAILURE ANALYSIS STYLES ==== */
+.expand-icon-subtask {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    margin-right: 8px;
+    text-align: center;
+    font-size: 12px;
+    color: #6c757d;
+    vertical-align: middle;
+    transition: color 0.3s ease;
+}
+
+.list-group-item:hover .expand-icon-subtask {
+    color: #007bff;
+}
+
+.json-viewer pre {
+    max-height: 200px;
+    overflow-y: auto;
+    font-size: 0.85em;
+}
+
+.failure-traceback {
+    max-height: 300px;
+    overflow-y: auto;
+    font-size: 0.8em;
+}
+
+/* ==== ENHANCED MONITORING BADGE ==== */
+.enhanced-monitoring-badge {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(0, 123, 255, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(0, 123, 255, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(0, 123, 255, 0);
+    }
+}
+
+/* ==== RESPONSIVE DESIGN ==== */
+@media (max-width: 768px) {
+    .task-tree {
+        font-size: 0.9em;
+    }
+    
+    .task-node {
+        padding: 6px;
+    }
+    
+    .task-progress-mini {
+        width: 80px;
+        height: 6px;
+    }
+    
+    .hierarchy-controls .btn {
+        font-size: 0.8em;
+        padding: 0.25rem 0.5rem;
+    }
+}
+
+/* ==== ACCESSIBILITY ==== */
+.task-node:focus {
+    outline: 2px solid #007bff;
+    outline-offset: 2px;
+}
+
+.expand-icon:focus {
+    outline: 2px solid #007bff;
+    outline-offset: 2px;
+}
+
+/* ==== PRINT STYLES ==== */
+@media print {
+    .task-tree {
+        font-family: monospace;
+        font-size: 10pt;
+    }
+    
+    .task-node {
+        break-inside: avoid;
+        border: 1px solid #000;
+        background: white !important;
+    }
+    
+    .hierarchy-controls {
+        display: none;
+    }
+}

@@ -5,16 +5,7 @@ These tasks demonstrate the enhanced monitoring capabilities.
 
 import time
 import random
-import os
 from celery import Celery, current_task
-
-# Try to import psutil for better metrics, fallback to basic commands
-try:
-    import psutil
-
-    PSUTIL_AVAILABLE = True
-except ImportError:
-    PSUTIL_AVAILABLE = False
 
 # Initialize Celery app
 app = Celery("enhanced_tasks", broker="redis://localhost:6379/0")
@@ -27,114 +18,17 @@ app.conf.update(
 
 
 # System metrics collector
-def get_system_metrics():
-    """Get lightweight system metrics for failure analysis"""
-    metrics = {
-        "hostname": os.environ.get(
-            "HOSTNAME", os.environ.get("COMPUTERNAME", "unknown")
-        )
-    }
-
-    try:
-        # Try psutil first (most reliable)
-        if PSUTIL_AVAILABLE:
-            cpu_percent = psutil.cpu_percent(interval=0.1)  # Quick sample
-            memory = psutil.virtual_memory()
-            metrics.update(
-                {
-                    "cpu_percent": round(cpu_percent, 1),
-                    "memory_percent": round(memory.percent, 1),
-                    "memory_available_gb": round(memory.available / (1024**3), 2),
-                }
-            )
-        else:
-            # Fallback to system commands (Unix/Linux/Mac)
-            try:
-                # Try to get load average (simple CPU indicator)
-                if hasattr(os, "getloadavg"):
-                    load_avg = os.getloadavg()[0]
-                    metrics["load_average_1min"] = round(load_avg, 2)
-
-                # Try basic memory info from /proc/meminfo (Linux)
-                if os.path.exists("/proc/meminfo"):
-                    with open("/proc/meminfo", "r") as f:
-                        meminfo = f.read()
-                        for line in meminfo.split("\n"):
-                            if line.startswith("MemTotal:"):
-                                total_kb = int(line.split()[1])
-                            elif line.startswith("MemAvailable:"):
-                                available_kb = int(line.split()[1])
-                                metrics.update(
-                                    {
-                                        "memory_percent": round(
-                                            100 - (available_kb / total_kb * 100), 1
-                                        ),
-                                        "memory_available_gb": round(
-                                            available_kb / (1024**2), 2
-                                        ),
-                                    }
-                                )
-                                break
-            except Exception:
-                pass  # Skip if system commands fail
-
-        # Load average (Unix/Linux/Mac)
-        try:
-            if hasattr(os, "getloadavg"):
-                load_avg = os.getloadavg()[0]  # 1-minute load average
-                metrics["load_average_1min"] = round(load_avg, 2)
-        except (OSError, AttributeError):
-            pass  # Windows doesn't have getloadavg
-
-        # Redis connection check (simple, no extra dependencies)
-        try:
-            import redis
-
-            r = redis.Redis(host="localhost", port=6379, db=0, socket_connect_timeout=1)
-            r.ping()
-            redis_info = r.info()
-            metrics["redis_status"] = {
-                "connected": True,
-                "memory_used": redis_info.get("used_memory_human", "unknown"),
-                "connected_clients": redis_info.get("connected_clients", 0),
-            }
-        except Exception:
-            metrics["redis_status"] = {"connected": False, "error": "connection_failed"}
-
-        # Get hostname properly
-        if hasattr(os, "uname"):
-            metrics["hostname"] = os.uname().nodename
-
-        return metrics
-
-    except Exception as e:
-        # Ultimate fallback - minimal info
-        return {
-            "error": f"metrics_collection_failed: {str(e)[:100]}",
-            "hostname": os.environ.get(
-                "HOSTNAME", os.environ.get("COMPUTERNAME", "unknown")
-            ),
-        }
 
 
-def send_custom_event(event_type, include_system_metrics=None, **kwargs):
+def send_custom_event(event_type, **kwargs):
     """
     Helper function to send custom events to Flower
 
     Args:
         event_type: Type of event to send
-        include_system_metrics: True/False to force include/exclude metrics,
-                               None for automatic (includes for failure events)
         **kwargs: Additional event data
     """
     if current_task:
-        # Automatically include system metrics for failure events
-        if include_system_metrics is None:
-            include_system_metrics = event_type == "task-custom-failure"
-
-        if include_system_metrics:
-            kwargs["system_metrics"] = get_system_metrics()
-
         current_task.send_event(event_type, **kwargs)
 
 
@@ -169,12 +63,11 @@ def heavy_single_task(self, num_records=1000):
         stage_records = int(num_records * stage_portion)
 
         for i in range(stage_records):
-            # Simulate work (longer duration for UI testing)
-            time.sleep(random.uniform(1.0, 2.0))
+            # Simulate work (demo-friendly duration)
+            time.sleep(random.uniform(0.5, 1.0))
             records_processed += 1
 
             # Calculate progress
-            stage_progress = (i + 1) / stage_records
             overall_progress = (records_processed / num_records) * 100
 
             # Update progress every 10 records or at stage boundaries
@@ -187,7 +80,6 @@ def heavy_single_task(self, num_records=1000):
                     total=num_records,
                     stage=stage_name,
                     stage_description=stage_desc,
-                    stage_progress=stage_progress * 100,
                     status=f"{stage_desc}: {records_processed}/{num_records} records ({overall_progress:.1f}%)",
                 )
 
@@ -268,29 +160,33 @@ def sync_data_parent_task(self, num_records=100):
         progress_percent=10,
     )
 
-    # Monitor subtasks completion
-    completed = 0
-    failed = 0
-
-    while completed + failed < subtasks_created:
-        time.sleep(1)  # Check every second
-
-        completed = 0
-        failed = 0
-
-        # Note: Using event-based monitoring instead of AsyncResult
-        # since result backend is disabled
-        progress = 10 + (90 * len(subtask_jobs) / subtasks_created)
-
-        send_custom_event(
-            "task-custom-progress",
-            status=f"All {subtasks_created} subtasks submitted successfully",
-            subtasks_created=subtasks_created,
-            subtasks_completed=len(subtask_jobs),
-            subtasks_failed=0,
-            progress_percent=100,
-            subtasks_remaining=0,
-        )
+    # Since result backend is disabled, we'll simulate task completion
+    # In a real scenario, you would monitor AsyncResult objects
+    
+    # Simulate monitoring for demonstration (simplified approach)
+    total_wait_time = 5  # seconds to wait before marking as complete
+    send_custom_event(
+        "task-custom-progress",
+        status=f"Monitoring {subtasks_created} subtasks...",
+        subtasks_created=subtasks_created,
+        subtasks_completed=0,
+        subtasks_failed=0,
+        progress_percent=50,
+        subtasks_remaining=subtasks_created,
+    )
+    
+    time.sleep(total_wait_time)
+    
+    # Mark as completed (simplified for demo without result backend)
+    send_custom_event(
+        "task-custom-progress",
+        status=f"All {subtasks_created} subtasks completed successfully",
+        subtasks_created=subtasks_created,
+        subtasks_completed=subtasks_created,
+        subtasks_failed=0,
+        progress_percent=100,
+        subtasks_remaining=0,
+    )
 
     # Enhanced failure handling for subtasks
     # Check for any failures in the created subtasks and send comprehensive failure metadata
@@ -303,7 +199,7 @@ def sync_data_parent_task(self, num_records=100):
             failure_metadata={
                 "subtasks_created": subtasks_created,
                 "subtasks_failed": failed_subtask_count,
-                "subtasks_completed": completed,
+                "subtasks_completed": subtasks_created - failed_subtask_count,
                 "failure_rate": (failed_subtask_count / subtasks_created) * 100,
                 "failure_type": "subtask_failures",
                 "monitoring_method": "parent_task_tracking",
@@ -339,7 +235,7 @@ def sync_data_subtask(self, start_index, count, parent_task_id):
     )
 
     # Simulate processing time
-    processing_time = random.uniform(30.0, 60.0)  # 30-60 seconds for UI testing
+    processing_time = random.uniform(15.0, 30.0)  # 15-30 seconds for demo
 
     # Small chance of failure for realistic testing
     if random.random() < 0.05:  # 5% failure rate
@@ -856,36 +752,13 @@ def failing_hierarchy_task(
     send_custom_event(
         "task-custom-progress",
         progress_percent=0,
-        status=f"Level {current_level}: Starting (may fail)",
+        status=f"Level {current_level}: Starting",
         stage=f"level_{current_level}_init",
         subtasks_created=0,
         subtasks_completed=0,
         subtasks_failed=0,
         subtasks_remaining=total_subtasks,
     )
-
-    # Randomly decide if this task should fail
-    if random.randint(1, 100) <= fail_percentage:
-        # Send failure metadata before failing
-        send_custom_event(
-            "task-custom-failure",
-            failure_reason=f"Simulated failure at level {current_level}",
-            failure_stage=f"level_{current_level}_processing",
-            failure_metadata={
-                "level": current_level,
-                "failure_type": "random_simulation",
-                "worker_load": random.choice(["low", "medium", "high"]),
-                "batch_size": random.randint(100, 1000),
-            },
-        )
-
-        # Simulate different types of failures
-        failure_types = [
-            ValueError(f"Processing failed at level {current_level}"),
-            ConnectionError(f"Database connection lost at level {current_level}"),
-            TimeoutError(f"Operation timed out at level {current_level}"),
-        ]
-        raise random.choice(failure_types)
 
     # Do some work with incremental progress updates
     send_custom_event(
@@ -959,7 +832,45 @@ def failing_hierarchy_task(
             depth=current_level - 1,
         )
 
-    # Final progress
+    # Randomly decide if this task should fail after creating subtasks
+    # This ensures we get a full hierarchy with some failures scattered throughout
+    if random.randint(1, 100) <= fail_percentage:
+        # Send failure metadata before failing
+        send_custom_event(
+            "task-custom-failure",
+            failure_reason=f"Simulated failure at level {current_level}",
+            failure_stage=f"level_{current_level}_post_processing",
+            failure_metadata={
+                "level": current_level,
+                "failure_type": "random_simulation",
+                "worker_load": random.choice(["low", "medium", "high"]),
+                "batch_size": random.randint(100, 1000),
+                "subtasks_created": len(child_tasks),
+                "hierarchy_depth": current_level,
+            },
+        )
+        
+        # Update progress to show failure
+        send_custom_event(
+            "task-custom-progress",
+            progress_percent=95,
+            status=f"Level {current_level}: FAILING after subtask creation",
+            stage=f"level_{current_level}_failing",
+            subtasks_created=len(child_tasks),
+            subtasks_completed=0,
+            subtasks_failed=0,
+            subtasks_remaining=len(child_tasks),
+        )
+
+        # Simulate different types of failures
+        failure_types = [
+            ValueError(f"Processing failed at level {current_level} after creating {len(child_tasks)} subtasks"),
+            ConnectionError(f"Database connection lost at level {current_level} during finalization"),
+            TimeoutError(f"Operation timed out at level {current_level} while completing"),
+        ]
+        raise random.choice(failure_types)
+    
+    # Final progress (only if task doesn't fail)
     send_custom_event(
         "task-custom-progress",
         progress_percent=100,

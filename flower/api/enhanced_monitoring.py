@@ -9,15 +9,9 @@ class TaskProgressHandler(BaseHandler):
     def get(self, task_id):
         """Get enhanced progress data for a specific task"""
         events_state = self.application.events.state
-
-        # Get progress data
         progress_data = events_state.task_progress.get(task_id, {})
-
-        # Get progress data from current state
-        # Note: Historical events are available but not needed by frontend
-
-        # Get task basic info
         task = events_state.tasks.get(task_id)
+        
         task_info = {}
         if task:
             task_info = {
@@ -27,15 +21,13 @@ class TaskProgressHandler(BaseHandler):
                 "received": getattr(task, "received", None),
             }
 
-        response = {
+        self.write({
             "task_id": task_id,
             "task_info": task_info,
             "current_progress": progress_data,
             "has_custom_progress": bool(progress_data),
             "last_updated": time.time(),
-        }
-
-        self.write(response)
+        })
 
 
 class TaskHierarchyHandler(BaseHandler):
@@ -43,28 +35,22 @@ class TaskHierarchyHandler(BaseHandler):
     def get(self, task_id):
         """Get hierarchy data for task visualization"""
         events_state = self.application.events.state
+        hierarchy = self._build_hierarchy_tree(task_id, events_state)
 
-        # Build hierarchy tree
-        hierarchy = self.build_hierarchy_tree(task_id, events_state)
+        self.write({
+            "task_id": task_id,
+            "hierarchy": hierarchy,
+            "has_hierarchy": hierarchy is not None,
+        })
 
-        self.write(
-            {
-                "task_id": task_id,
-                "hierarchy": hierarchy,
-                "has_hierarchy": hierarchy is not None,
-            }
-        )
-
-    def build_hierarchy_tree(self, root_task_id, events_state):
+    def _build_hierarchy_tree(self, root_task_id, events_state):
         """Build hierarchical tree structure for visualization"""
-
         def get_task_info(task_id):
             task = events_state.tasks.get(task_id)
             hierarchy_info = events_state.task_hierarchies.get(task_id, {})
             progress_info = events_state.task_progress.get(task_id, {})
 
             if not task:
-                # Return minimal info if task not found but referenced
                 return {
                     "id": task_id,
                     "name": "Unknown Task",
@@ -74,17 +60,16 @@ class TaskHierarchyHandler(BaseHandler):
                     "children": [],
                 }
 
+            worker = getattr(task, "worker", {})
+            worker_hostname = worker.hostname if hasattr(worker, "hostname") else None
+
             return {
                 "id": task_id,
                 "name": getattr(task, "name", "Unknown"),
                 "state": getattr(task, "state", "UNKNOWN"),
                 "started": getattr(task, "started", None),
                 "runtime": getattr(task, "runtime", None),
-                "worker": (
-                    getattr(task, "worker", {}).hostname
-                    if hasattr(getattr(task, "worker", {}), "hostname")
-                    else None
-                ),
+                "worker": worker_hostname,
                 "task_type": hierarchy_info.get("task_type", "single"),
                 "depth": hierarchy_info.get("depth", 0),
                 "progress_percent": progress_info.get("progress_percent", 0),
@@ -96,24 +81,22 @@ class TaskHierarchyHandler(BaseHandler):
                 "children": [],
             }
 
-        def build_tree(task_id, visited=None, max_depth=5):
+        def build_tree(task_id, visited=None):
             if visited is None:
                 visited = set()
 
-            if task_id in visited or len(visited) > max_depth:
-                return None  # Prevent infinite loops and deep recursion
+            if task_id in visited or len(visited) > 10:  # Prevent cycles and limit depth
+                return None
 
             visited.add(task_id)
             task_info = get_task_info(task_id)
 
-            # Get children from hierarchy data
             hierarchy_data = events_state.task_hierarchies.get(task_id, {})
             children_ids = hierarchy_data.get("children", [])
 
-            # Build children
             children = []
             for child_id in children_ids:
-                child_tree = build_tree(child_id, visited.copy(), max_depth)
+                child_tree = build_tree(child_id, visited.copy())
                 if child_tree:
                     children.append(child_tree)
 
@@ -133,19 +116,11 @@ class TaskFailureAnalysisHandler(BaseHandler):
         if not task:
             raise web.HTTPError(404, f"Task {task_id} not found")
 
-        # Get basic failure info
         task_state = getattr(task, "state", "UNKNOWN")
         has_failed = task_state in ["FAILURE", "REVOKED"]
-
-        # Get custom failure metadata
         failure_metadata = events_state.task_failure_metadata.get(task_id, {})
+        failed_subtasks = self._collect_failed_subtasks(task_id, events_state)
 
-        # Get failed subtasks across hierarchy
-        failed_subtasks = self.collect_failed_subtasks(task_id, events_state)
-
-        # Note: Historical failure events no longer stored (memory optimization)
-        # Current failure state is maintained in failure_metadata
-        
         failure_data = {
             "task_id": task_id,
             "has_failed": has_failed,
@@ -154,87 +129,35 @@ class TaskFailureAnalysisHandler(BaseHandler):
             "traceback": getattr(task, "traceback", None),
             "retry_count": getattr(task, "retries", 0),
             "custom_failure_metadata": failure_metadata,
-            "failure_events": [],  # Historical events eliminated for memory optimization
             "has_custom_failure_data": bool(failure_metadata),
             "failed_subtasks": failed_subtasks,
             "subtask_failure_count": len(failed_subtasks),
         }
 
-        # Automated failure analysis removed - not using GPT models
-
-        # Add subtask failure summary
         if failed_subtasks:
-            failure_data["subtask_failure_summary"] = self.analyze_subtask_failures(failed_subtasks)
+            failure_data["subtask_failure_summary"] = self._analyze_subtask_failures(failed_subtasks)
 
         self.write(failure_data)
 
-    def analyze_failure(self, task, custom_metadata):
-        """Provide basic failure analysis"""
-        exception = getattr(task, "exception", "") or ""
-        traceback = getattr(task, "traceback", "") or ""
-
-        analysis = {
-            "exception_type": (
-                exception.split(":")[0] if ":" in exception else "Unknown"
-            ),
-            "likely_causes": [],
-            "suggested_actions": [],
-            "failure_patterns": [],
-        }
-
-        # Simple failure pattern matching
-        exception_lower = exception.lower()
-        traceback_lower = traceback.lower()
-
-        if "connectionerror" in exception_lower or "connection" in exception_lower:
-            analysis["likely_causes"].append("Network connectivity issue")
-            analysis["suggested_actions"].append(
-                "Check network configuration and service availability"
-            )
-            analysis["failure_patterns"].append("NETWORK_ERROR")
-
-        if "timeout" in exception_lower or "timeouterror" in exception_lower:
-            analysis["likely_causes"].append("Operation timeout")
-            analysis["suggested_actions"].append(
-                "Increase timeout or optimize task performance"
-            )
-            analysis["failure_patterns"].append("TIMEOUT_ERROR")
-
-        if "memoryerror" in exception_lower or "memory" in exception_lower:
-            analysis["likely_causes"].append("Insufficient memory")
-            analysis["suggested_actions"].append(
-                "Increase worker memory or optimize memory usage"
-            )
-            analysis["failure_patterns"].append("MEMORY_ERROR")
-
-        if "permission" in exception_lower or "access" in exception_lower:
-            analysis["likely_causes"].append("Permission or access issue")
-            analysis["suggested_actions"].append("Check file/resource permissions")
-            analysis["failure_patterns"].append("PERMISSION_ERROR")
-
-        # Add custom failure metadata analysis
-        if custom_metadata:
-            custom_reason = custom_metadata.get("failure_reason", "")
-            if custom_reason:
-                analysis["likely_causes"].append(f"Custom failure: {custom_reason}")
-
-        return analysis
-
-    def collect_failed_subtasks(self, root_task_id, events_state, visited=None, max_depth=10):
+    def _collect_failed_subtasks(self, root_task_id, events_state, visited=None):
         """Recursively collect all failed subtasks in hierarchy"""
         if visited is None:
             visited = set()
         
-        if root_task_id in visited or len(visited) > max_depth:
+        if root_task_id in visited or len(visited) > 20:  # Prevent cycles
             return []
         
         visited.add(root_task_id)
         failed_subtasks = []
         
-        # Check if current task is failed
         task = events_state.tasks.get(root_task_id)
         if task and getattr(task, "state", "UNKNOWN") in ["FAILURE", "REVOKED"]:
             failure_metadata = events_state.task_failure_metadata.get(root_task_id, {})
+            worker = getattr(task, "worker", {})
+            worker_hostname = worker.hostname if hasattr(worker, "hostname") else None
+            
+            exception = getattr(task, "exception", "")
+            exception_type = exception.split(":")[0] if ":" in exception else "Unknown"
             
             failed_subtasks.append({
                 "task_id": root_task_id,
@@ -242,39 +165,37 @@ class TaskFailureAnalysisHandler(BaseHandler):
                 "state": getattr(task, "state", "UNKNOWN"),
                 "failed_at": getattr(task, "failed", None),
                 "timestamp": getattr(task, "timestamp", None),
-                "worker": getattr(task, "worker", {}).hostname if hasattr(getattr(task, "worker", {}), "hostname") else None,
-                "exception": getattr(task, "exception", ""),
+                "worker": worker_hostname,
+                "exception": exception,
                 "traceback": getattr(task, "traceback", ""),
                 "retry_count": getattr(task, "retries", 0),
                 "failure_reason": failure_metadata.get("failure_reason", ""),
                 "failure_metadata": failure_metadata.get("failure_metadata", {}),
                 "failure_stage": failure_metadata.get("failure_stage", ""),
                 "error_details": {
-                    "exception_type": getattr(task, "exception", "").split(":")[0] if getattr(task, "exception", "") and ":" in getattr(task, "exception", "") else "Unknown",
-                    "error_message": getattr(task, "exception", ""),
+                    "exception_type": exception_type,
+                    "error_message": exception,
                     "full_traceback": getattr(task, "traceback", ""),
                     "custom_metadata": failure_metadata.get("failure_metadata", {}),
-                    "system_metrics": failure_metadata.get("system_metrics", {}),
                     "failure_context": {
                         "stage": failure_metadata.get("failure_stage", ""),
                         "reason": failure_metadata.get("failure_reason", ""),
                         "retry_count": getattr(task, "retries", 0),
-                        "worker": getattr(task, "worker", {}).hostname if hasattr(getattr(task, "worker", {}), "hostname") else None,
+                        "worker": worker_hostname,
                     }
                 }
             })
         
-        # Get children from hierarchy data and recursively check them
         hierarchy_data = events_state.task_hierarchies.get(root_task_id, {})
         children_ids = hierarchy_data.get("children", [])
         
         for child_id in children_ids:
-            child_failures = self.collect_failed_subtasks(child_id, events_state, visited.copy(), max_depth)
+            child_failures = self._collect_failed_subtasks(child_id, events_state, visited.copy())
             failed_subtasks.extend(child_failures)
         
         return failed_subtasks
     
-    def analyze_subtask_failures(self, failed_subtasks):
+    def _analyze_subtask_failures(self, failed_subtasks):
         """Analyze patterns in failed subtasks"""
         if not failed_subtasks:
             return {}
@@ -282,23 +203,19 @@ class TaskFailureAnalysisHandler(BaseHandler):
         failure_types = {}
         failure_stages = {}
         workers_affected = set()
-        total_failures = len(failed_subtasks)
         
         for subtask in failed_subtasks:
-            # Categorize by exception type
             exc_type = subtask["error_details"].get("exception_type", "Unknown")
             failure_types[exc_type] = failure_types.get(exc_type, 0) + 1
             
-            # Categorize by failure stage
             stage = subtask.get("failure_stage", "unknown")
             failure_stages[stage] = failure_stages.get(stage, 0) + 1
             
-            # Track affected workers
             if subtask.get("worker"):
                 workers_affected.add(subtask["worker"])
         
         return {
-            "total_failed_subtasks": total_failures,
+            "total_failed_subtasks": len(failed_subtasks),
             "failure_types": failure_types,
             "failure_stages": failure_stages,
             "workers_affected": list(workers_affected),
@@ -308,66 +225,38 @@ class TaskFailureAnalysisHandler(BaseHandler):
         }
 
 
-class TaskCustomEventsHandler(BaseHandler):
-    @web.authenticated
-    def get(self, task_id):
-        """Get all custom events for a task"""
-        events_state = self.application.events.state
-
-        # Historical events eliminated for memory optimization
-        # This endpoint now returns empty event data
-        
-        self.write(
-            {
-                "task_id": task_id,
-                "total_events": 0,  # Events no longer stored
-                "events_by_type": {},  # Events no longer stored
-                "all_events": [],  # Events no longer stored
-                "note": "Historical events eliminated for memory optimization"
-            }
-        )
-
-
 class TaskMetadataHandler(BaseHandler):
     @web.authenticated
     def get(self, task_id):
         """Get comprehensive task metadata including custom data"""
         events_state = self.application.events.state
 
-        # Get all data for the task
         task = events_state.tasks.get(task_id)
         progress_data = events_state.task_progress.get(task_id, {})
         hierarchy_data = events_state.task_hierarchies.get(task_id, {})
         failure_data = events_state.task_failure_metadata.get(task_id, {})
-        # Historical events eliminated for memory optimization
         
-        # Build comprehensive metadata
         metadata = {
             "task_id": task_id,
             "basic_info": {},
             "progress": progress_data,
             "hierarchy": hierarchy_data,
             "failure_metadata": failure_data,
-            "custom_events_count": 0,  # Events no longer stored
-            "has_enhanced_monitoring": bool(
-                progress_data or hierarchy_data or failure_data
-            ),
+            "has_enhanced_monitoring": bool(progress_data or hierarchy_data or failure_data),
             "monitoring_types": [],
         }
 
-        # Add basic task info
         if task:
+            worker = getattr(task, "worker", {})
+            worker_hostname = worker.hostname if hasattr(worker, "hostname") else None
+            
             metadata["basic_info"] = {
                 "name": getattr(task, "name", ""),
                 "state": getattr(task, "state", "UNKNOWN"),
                 "started": getattr(task, "started", None),
                 "received": getattr(task, "received", None),
                 "runtime": getattr(task, "runtime", None),
-                "worker": (
-                    getattr(task, "worker", {}).hostname
-                    if hasattr(getattr(task, "worker", {}), "hostname")
-                    else None
-                ),
+                "worker": worker_hostname,
                 "retries": getattr(task, "retries", 0),
             }
 

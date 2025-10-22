@@ -59,59 +59,58 @@ class PrometheusMetrics:
 
 
 class EventsState(State):
-    # EventsState object is created and accessed only from ioloop thread
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.counter = collections.defaultdict(Counter)
         self.metrics = get_prometheus_metrics()
 
-        # Enhanced task monitoring storage
-        self.task_progress = {}  # task_id -> progress data
-        self.task_hierarchies = {}  # task_id -> hierarchy info
-        # task_custom_events removed - no historical event storage needed (memory optimization)
-        self.task_failure_metadata = {}  # task_id -> failure details
+        # Custom task event state storage - current state only
+        self.task_progress = {}
+        self.task_hierarchies = {}
+        self.task_failure_metadata = {}
 
     def event(self, event):
-        # Handle custom events for enhanced monitoring first
         worker_name = event["hostname"]
         event_type = event["type"]
 
+        # Handle custom events
         if event_type.startswith("task-custom-"):
-            self.handle_custom_event(event)
-            return  # Don't pass custom events to parent State class
-        
-        # Save the event to parent State class for standard events only
-        super().event(event)
+            self._handle_custom_event(event)
+            return
 
+        # Process standard events
+        super().event(event)
         self.counter[worker_name][event_type] += 1
 
         if event_type.startswith("task-"):
-            task_id = event["uuid"]
-            task = self.tasks.get(task_id)
-            task_name = event.get("name", "")
-            if not task_name and task_id in self.tasks:
-                task_name = task.name or ""
-            self.metrics.events.labels(worker_name, event_type, task_name).inc()
+            self._handle_task_event(event, worker_name, event_type)
+        elif event_type.startswith("worker-"):
+            self._handle_worker_event(event, worker_name, event_type)
 
-            runtime = event.get("runtime", 0)
-            if runtime:
-                self.metrics.runtime.labels(worker_name, task_name).observe(runtime)
+    def _handle_task_event(self, event, worker_name, event_type):
+        """Handle task-related events"""
+        task_id = event["uuid"]
+        task = self.tasks.get(task_id)
+        task_name = event.get("name", "")
+        if not task_name and task:
+            task_name = task.name or ""
+        
+        self.metrics.events.labels(worker_name, event_type, task_name).inc()
 
+        runtime = event.get("runtime", 0)
+        if runtime:
+            self.metrics.runtime.labels(worker_name, task_name).observe(runtime)
+
+        if task and not task.eta:
             task_started = task.started
             task_received = task.received
 
-            if event_type == "task-received" and not task.eta and task_received:
+            if event_type == "task-received" and task_received:
                 self.metrics.number_of_prefetched_tasks.labels(
                     worker_name, task_name
                 ).inc()
 
-            if (
-                event_type == "task-started"
-                and not task.eta
-                and task_started
-                and task_received
-            ):
+            if event_type == "task-started" and task_started and task_received:
                 self.metrics.prefetch_time.labels(worker_name, task_name).set(
                     task_started - task_received
                 )
@@ -119,50 +118,43 @@ class EventsState(State):
                     worker_name, task_name
                 ).dec()
 
-            if (
-                event_type in ["task-succeeded", "task-failed"]
-                and not task.eta
-                and task_started
-                and task_received
-            ):
+            if event_type in ["task-succeeded", "task-failed"] and task_started and task_received:
                 self.metrics.prefetch_time.labels(worker_name, task_name).set(0)
 
+    def _handle_worker_event(self, event, worker_name, event_type):
+        """Handle worker-related events"""
         if event_type == "worker-online":
             self.metrics.worker_online.labels(worker_name).set(1)
-
-        if event_type == "worker-heartbeat":
+        elif event_type == "worker-offline":
+            self.metrics.worker_online.labels(worker_name).set(0)
+        elif event_type == "worker-heartbeat":
             self.metrics.worker_online.labels(worker_name).set(1)
-
             num_executing_tasks = event.get("active")
             if num_executing_tasks is not None:
                 self.metrics.worker_number_of_currently_executing_tasks.labels(
                     worker_name
                 ).set(num_executing_tasks)
 
-        if event_type == "worker-offline":
-            self.metrics.worker_online.labels(worker_name).set(0)
-
-    def handle_custom_event(self, event):
+    def _handle_custom_event(self, event):
         """Handle custom events for enhanced task monitoring"""
         task_id = event.get("uuid")
         event_type = event.get("type")
-        timestamp = event.get("timestamp", time.time())
 
         if not task_id:
             return
 
-        # Process event to update current state (no historical storage needed)
-        # Events are transient - we maintain current state separately
-        if event_type == "task-custom-progress":
-            self.handle_progress_event(task_id, event)
-        elif event_type == "task-custom-hierarchy":
-            self.handle_hierarchy_event(task_id, event)
-        elif event_type == "task-custom-failure":
-            self.handle_failure_event(task_id, event)
-        elif event_type == "task-custom-chain-progress":
-            self.handle_chain_progress_event(task_id, event)
+        event_handlers = {
+            "task-custom-progress": self._handle_progress_event,
+            "task-custom-hierarchy": self._handle_hierarchy_event,
+            "task-custom-failure": self._handle_failure_event,
+            "task-custom-chain-progress": self._handle_chain_progress_event,
+        }
 
-    def handle_progress_event(self, task_id, event):
+        handler = event_handlers.get(event_type)
+        if handler:
+            handler(task_id, event)
+
+    def _handle_progress_event(self, task_id, event):
         """Handle task progress updates"""
         self.task_progress[task_id] = {
             "progress_percent": event.get("progress_percent", 0),
@@ -170,7 +162,6 @@ class EventsState(State):
             "total": event.get("total", 1),
             "stage": event.get("stage", "processing"),
             "stage_description": event.get("stage_description", ""),
-            "stage_progress": event.get("stage_progress", 0),
             "status": event.get("status", ""),
             "subtasks_created": event.get("subtasks_created", 0),
             "subtasks_completed": event.get("subtasks_completed", 0),
@@ -179,7 +170,7 @@ class EventsState(State):
             "last_updated": event.get("timestamp", time.time()),
         }
 
-    def handle_hierarchy_event(self, task_id, event):
+    def _handle_hierarchy_event(self, task_id, event):
         """Handle task hierarchy information"""
         self.task_hierarchies[task_id] = {
             "parent_id": event.get("parent_id"),
@@ -190,7 +181,7 @@ class EventsState(State):
             "last_updated": event.get("timestamp", time.time()),
         }
 
-    def handle_failure_event(self, task_id, event):
+    def _handle_failure_event(self, task_id, event):
         """Handle task failure metadata"""
         self.task_failure_metadata[task_id] = {
             "failure_reason": event.get("failure_reason", ""),
@@ -200,25 +191,21 @@ class EventsState(State):
             "last_error": event.get("last_error", ""),
             "error_traceback": event.get("error_traceback", ""),
             "failed_at": event.get("timestamp", time.time()),
-            "system_metrics": event.get("system_metrics", {}),
         }
 
-    def handle_chain_progress_event(self, task_id, event):
+    def _handle_chain_progress_event(self, task_id, event):
         """Handle chain task progression"""
-        # Update both progress and hierarchy for chain tasks
-        self.handle_progress_event(task_id, event)
+        self._handle_progress_event(task_id, event)
 
         # Add chain-specific data
         if task_id in self.task_progress:
-            self.task_progress[task_id].update(
-                {
-                    "current_step": event.get("current_step", 1),
-                    "total_steps": event.get("total_steps", 1),
-                    "pipeline_progress": event.get("pipeline_progress", 0),
-                    "current_stage_name": event.get("current_stage_name", ""),
-                    "chain_type": "sequential",
-                }
-            )
+            self.task_progress[task_id].update({
+                "current_step": event.get("current_step", 1),
+                "total_steps": event.get("total_steps", 1),
+                "pipeline_progress": event.get("pipeline_progress", 0),
+                "current_stage_name": event.get("current_stage_name", ""),
+                "chain_type": "sequential",
+            })
 
 
 class Events(threading.Thread):
