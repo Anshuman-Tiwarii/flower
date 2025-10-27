@@ -6,6 +6,7 @@ These functions are used by Celery tasks to report progress, hierarchy, and fail
 """
 
 import logging
+import threading
 from typing import Optional, Dict, Any, List
 from celery import current_task
 
@@ -13,15 +14,50 @@ from .types import EVENT_TYPES
 
 logger = logging.getLogger(__name__)
 
+# Thread-local storage for context propagation
+_local = threading.local()
+
+
+def _get_task_context():
+    """Smart task context resolution with fallback mechanisms"""
+    # Primary: Current Celery task context
+    if current_task:
+        return current_task, current_task.request.id
+    
+    # Fallback: Thread-local context (for threaded scenarios)
+    if hasattr(_local, 'task_context'):
+        task_obj, task_id = _local.task_context
+        logger.debug(f"Using thread-local task context: {task_id}")
+        return task_obj, task_id
+    
+    return None, None
+
+
+def set_thread_task_context(task_obj, task_id):
+    """Set task context for thread-local propagation"""
+    _local.task_context = (task_obj, task_id)
+    logger.debug(f"Set thread-local task context: {task_id}")
+
+
+def clear_thread_task_context():
+    """Clear thread-local task context"""
+    if hasattr(_local, 'task_context'):
+        delattr(_local, 'task_context')
+
 
 def send_custom_event(event_type: str, **kwargs) -> bool:
-    """Send custom events via Celery's native event system"""
+    """Send custom events via Celery's native event system with smart context resolution"""
     try:
-        if current_task:
-            current_task.send_event(event_type, **kwargs)
+        task_obj, task_id = _get_task_context()
+        
+        if task_obj:
+            # Add task_id to event data for debugging
+            kwargs['_task_id'] = task_id
+            task_obj.send_event(event_type, **kwargs)
+            logger.debug(f"Sent {event_type} event from task {task_id}")
             return True
         else:
-            logger.warning(f"No current task available to send {event_type} event")
+            logger.warning(f"No task context available to send {event_type} event. Available kwargs: {list(kwargs.keys())}")
             return False
     except Exception as e:
         logger.error(f"Failed to send {event_type} event: {e}")
@@ -138,13 +174,20 @@ def send_hierarchy_event(
             depth=1
         )
     """
+    # Smart task ID resolution with debugging
+    task_obj, current_task_id = _get_task_context()
+    
     # Auto-detect parent from Celery context if not provided
     if parent_id is None:
         try:
-            if current_task and hasattr(current_task.request, "parent_id"):
-                parent_id = current_task.request.parent_id
+            if task_obj and hasattr(task_obj.request, "parent_id"):
+                parent_id = task_obj.request.parent_id
+                logger.debug(f"Auto-detected parent_id: {parent_id} for task: {current_task_id}")
         except (ImportError, AttributeError):
             pass
+
+    # Enhanced debugging for hierarchy events
+    logger.debug(f"Sending hierarchy event: task_type={task_type}, current_task={current_task_id}, parent_id={parent_id}, children={len(children or [])}")
 
     return send_custom_event(
         EVENT_TYPES["HIERARCHY"],
@@ -153,6 +196,7 @@ def send_hierarchy_event(
         children=children or [],
         depth=depth,
         hierarchy_data=hierarchy_data or {},
+        _current_task_id=current_task_id,  # Include for debugging
     )
 
 

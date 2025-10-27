@@ -28,6 +28,9 @@ from .events import (
     send_failure_event,
     bulk_send_events,
     test_connection,
+    # Threading support
+    set_thread_task_context,
+    clear_thread_task_context,
 )
 
 # Decorators
@@ -67,6 +70,9 @@ __all__ = [
     "send_failure_event",
     "bulk_send_events",
     "test_connection",
+    # Threading support
+    "set_thread_task_context",
+    "clear_thread_task_context",
     # Decorators
     "enhanced_monitoring",
     "hierarchy_task",
