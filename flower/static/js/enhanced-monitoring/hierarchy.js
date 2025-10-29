@@ -27,10 +27,10 @@ var HierarchyMonitoring = (function () {
     }
 
     function initializeHierarchyTab() {
-        // Load hierarchy data immediately and also when tab is shown
-        loadHierarchyData();
+        // Don't load data immediately - let the main controller handle initial loading
+        // This prevents showing "No data available" prematurely
         
-        // Also reload when tab is clicked (in case data has changed)
+        // Reload when tab is clicked (in case data has changed)
         $('#hierarchy-tab').on('shown.bs.tab', function() {
             loadHierarchyData();
         });

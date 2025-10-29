@@ -27,7 +27,8 @@ var ProgressMonitoring = (function () {
     }
 
     function initializeProgressTab() {
-        loadProgressData();
+        // Don't load data immediately - let the main controller handle initial loading
+        // This prevents showing "No data available" prematurely
     }
 
     function loadProgressData() {

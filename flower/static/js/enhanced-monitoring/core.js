@@ -95,30 +95,66 @@ var EnhancedMonitoringCore = (function () {
     }
 
     function checkEnhancedMonitoringStatus(callback) {
-        makeApiRequest('metadata', {
-            success: function(data) {
-                if (data.has_enhanced_monitoring) {
+        // Instead of relying on metadata, try to load actual data for each tab
+        // This ensures we don't show "No data available" prematurely
+        var hasAnyData = false;
+        var checksCompleted = 0;
+        var totalChecks = 3; // progress, hierarchy, failure-analysis
+        
+        function checkComplete() {
+            checksCompleted++;
+            if (checksCompleted === totalChecks) {
+                if (hasAnyData) {
                     $('#enhanced-monitoring-badge').removeClass('d-none');
+                    console.log('Enhanced monitoring data found');
                     if (callback) callback(true);
                 } else {
                     console.log('No enhanced monitoring data available for task:', taskId);
-                    showNoEnhancedDataMessage();
                     if (callback) callback(false);
                 }
+            }
+        }
+        
+        // Check for progress data
+        makeApiRequest('progress', {
+            success: function(data) {
+                if (data && data.has_progress) {
+                    hasAnyData = true;
+                }
+                checkComplete();
             },
-            error: function(xhr, status, error) {
-                console.log('Error checking enhanced monitoring status:', error);
-                showNoEnhancedDataMessage();
-                if (callback) callback(false);
+            error: function() {
+                checkComplete();
+            }
+        });
+        
+        // Check for hierarchy data
+        makeApiRequest('hierarchy', {
+            success: function(data) {
+                if (data && data.has_hierarchy) {
+                    hasAnyData = true;
+                }
+                checkComplete();
+            },
+            error: function() {
+                checkComplete();
+            }
+        });
+        
+        // Check for failure analysis data
+        makeApiRequest('failure-analysis', {
+            success: function(data) {
+                if (data && data.has_failure_analysis) {
+                    hasAnyData = true;
+                }
+                checkComplete();
+            },
+            error: function() {
+                checkComplete();
             }
         });
     }
 
-    function showNoEnhancedDataMessage() {
-        $('#progress-container').html('<div class="alert alert-info">No enhanced progress data available for this task.</div>');
-        $('#hierarchy-container').html('<div class="alert alert-info">No hierarchy data available for this task.</div>');
-        $('#failure-analysis-container').html('<div class="alert alert-info">No enhanced failure analysis available for this task.</div>');
-    }
 
     function setupTabHandlers() {
         // Handle tab switching

@@ -35,9 +35,14 @@ var EnhancedTaskMonitoring = (function () {
                 // Setup global tab handlers
                 EnhancedMonitoringCore.setupTabHandlers();
                 
+                // Load initial data for the currently active tab
+                loadInitialTabData();
+                
                 console.log('Enhanced monitoring fully initialized with real-time updates');
             } else {
                 console.log('Task does not have enhanced monitoring data');
+                // Only show no data messages if we actually have no data
+                showNoDataForAllTabs();
             }
         });
 
@@ -120,6 +125,35 @@ var EnhancedTaskMonitoring = (function () {
                     startRealTimeUpdates();
                 }
             });
+        }
+    }
+
+    function loadInitialTabData() {
+        // Load data for the currently active tab on page load
+        var activeTab = $('.nav-link.active').attr('href');
+        
+        if (activeTab === '#progress' && activeModules.includes('progress') && ProgressMonitoring.loadProgressData) {
+            ProgressMonitoring.loadProgressData();
+        } else if (activeTab === '#hierarchy' && activeModules.includes('hierarchy') && HierarchyMonitoring.loadHierarchyData) {
+            HierarchyMonitoring.loadHierarchyData();
+        } else if (activeTab === '#failure-analysis' && activeModules.includes('failure-analysis') && FailureAnalysis.loadFailureAnalysis) {
+            FailureAnalysis.loadFailureAnalysis();
+        }
+        
+        // If overview tab is active (default), don't load enhanced data yet
+        console.log('Initial tab data loaded for:', activeTab);
+    }
+    
+    function showNoDataForAllTabs() {
+        // Only show no data messages if we've confirmed there's no enhanced data
+        if (activeModules.includes('progress')) {
+            $('#progress-container').html('<div class="alert alert-info">No enhanced progress data available for this task.</div>');
+        }
+        if (activeModules.includes('hierarchy')) {
+            $('#hierarchy-container').html('<div class="alert alert-info">No hierarchy data available for this task.</div>');
+        }
+        if (activeModules.includes('failure-analysis')) {
+            $('#failure-analysis-container').html('<div class="alert alert-info">No enhanced failure analysis available for this task.</div>');
         }
     }
 
