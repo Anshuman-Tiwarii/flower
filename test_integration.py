@@ -23,14 +23,15 @@ from flower_enhanced import (
 
 # Add the current directory to Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
 # Configure Celery app
 app = Celery("integration_test")
-app.conf.broker_url = "redis://localhost:6379/0"
-app.conf.result_backend = "redis://localhost:6379/0"
+app.conf.broker_url = REDIS_URL
+app.conf.result_backend = REDIS_URL
 
 # Configure enhanced monitoring
-configure(redis_url="redis://localhost:6379/0", enabled=True, debug=True)
+configure(redis_url=REDIS_URL, enabled=True, debug=True)
 
 
 @app.task(bind=True)

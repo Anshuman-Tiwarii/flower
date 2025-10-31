@@ -300,12 +300,6 @@ var FailureAnalysis = (function () {
             `;
         }
 
-        // Add system metrics if available
-        var systemMetrics = errorDetails.system_metrics;
-        if (systemMetrics) {
-            detailsHtml += renderSystemMetrics(systemMetrics);
-        }
-
         // Add full traceback if available
         if (errorDetails.full_traceback && errorDetails.full_traceback.trim() !== '') {
             detailsHtml += `
@@ -319,58 +313,7 @@ var FailureAnalysis = (function () {
         return detailsHtml;
     }
 
-    function renderSystemMetrics(systemMetrics) {
-        return `
-            <div class="mt-3">
-                <h6 class="text-primary">System Metrics (at failure time)</h6>
-                <div class="row">
-                    <div class="col-md-6">
-                        <table class="table table-sm table-borderless">
-                            ${systemMetrics.cpu_percent !== null && systemMetrics.cpu_percent !== undefined ? `
-                                <tr><td class="fw-bold">CPU Usage:</td><td><span class="badge ${systemMetrics.cpu_percent > 80 ? 'bg-danger' : systemMetrics.cpu_percent > 60 ? 'bg-warning' : 'bg-success'}">${systemMetrics.cpu_percent}%</span></td></tr>
-                            ` : ''}
-                            ${systemMetrics.memory_percent !== null && systemMetrics.memory_percent !== undefined ? `
-                                <tr><td class="fw-bold">Memory Usage:</td><td><span class="badge ${systemMetrics.memory_percent > 90 ? 'bg-danger' : systemMetrics.memory_percent > 80 ? 'bg-warning' : 'bg-success'}">${systemMetrics.memory_percent}%</span></td></tr>
-                            ` : ''}
-                            ${systemMetrics.memory_available_gb !== null && systemMetrics.memory_available_gb !== undefined ? `
-                                <tr><td class="fw-bold">Available RAM:</td><td>${systemMetrics.memory_available_gb} GB</td></tr>
-                            ` : ''}
-                            ${systemMetrics.load_average_1min !== null && systemMetrics.load_average_1min !== undefined ? `
-                                <tr><td class="fw-bold">Load Average:</td><td><span class="badge ${systemMetrics.load_average_1min > 2 ? 'bg-danger' : systemMetrics.load_average_1min > 1 ? 'bg-warning' : 'bg-success'}">${systemMetrics.load_average_1min}</span></td></tr>
-                            ` : ''}
-                        </table>
-                    </div>
-                    <div class="col-md-6">
-                        <table class="table table-sm table-borderless">
-                            <tr><td class="fw-bold">Hostname:</td><td><code>${systemMetrics.hostname || 'unknown'}</code></td></tr>
-                            ${systemMetrics.redis_status && typeof systemMetrics.redis_status === 'object' ? `
-                                <tr><td class="fw-bold">Redis:</td><td>
-                                    ${systemMetrics.redis_status.connected ? 
-                                        '<span class="badge bg-success">Connected</span>' : 
-                                        '<span class="badge bg-danger">Disconnected</span>'}
-                                </td></tr>
-                                ${systemMetrics.redis_status.memory_used ? `
-                                    <tr><td class="fw-bold">Redis Memory:</td><td>${systemMetrics.redis_status.memory_used}</td></tr>
-                                ` : ''}
-                                ${systemMetrics.redis_status.connected_clients !== undefined ? `
-                                    <tr><td class="fw-bold">Redis Clients:</td><td>${systemMetrics.redis_status.connected_clients}</td></tr>
-                                ` : ''}
-                            ` : ''}
-                        </table>
-                    </div>
-                </div>
-                ${systemMetrics.error ? `
-                    <div class="alert alert-warning alert-sm">
-                        <small><strong>Note:</strong> ${systemMetrics.error}</small>
-                    </div>
-                ` : ''}
-            </div>
-        `;
-    }
-
-    function setupSubtaskFailureHandlers() {
-        // Event handlers are set up via onclick attributes for simplicity
-    }
+    
 
     // Global function for toggling subtask error details
     window.toggleSubtaskErrorDetails = function(index) {
