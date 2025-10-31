@@ -2,7 +2,7 @@ import os
 
 from tornado.web import StaticFileHandler, url
 
-from .api import control, tasks, workers
+from .api import control, tasks, workers, enhanced_monitoring
 from .utils import gen_cookie_secret
 from .views import auth, monitor
 from .views.broker import BrokerView
@@ -51,6 +51,11 @@ handlers = [
     (r"/api/task/timeout/(.+)", control.TaskTimout),
     (r"/api/task/rate-limit/(.+)", control.TaskRateLimit),
     (r"/api/task/revoke/(.+)", control.TaskRevoke),
+    # Enhanced monitoring API
+    (r"/api/task/([^/]+)/progress", enhanced_monitoring.TaskProgressHandler),
+    (r"/api/task/([^/]+)/hierarchy", enhanced_monitoring.TaskHierarchyHandler),
+    (r"/api/task/([^/]+)/failure-analysis", enhanced_monitoring.TaskFailureAnalysisHandler),
+    (r"/api/task/([^/]+)/metadata", enhanced_monitoring.TaskMetadataHandler),
     # Metrics
     (r"/metrics", monitor.Metrics),
     (r"/healthcheck", monitor.Healthcheck),

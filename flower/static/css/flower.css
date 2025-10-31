@@ -39,3 +39,164 @@ div.dataTables_wrapper .dataTables_filter input {
 .overflow-auto::-webkit-scrollbar {
   display: none;
 }
+
+/* Enhanced Task Monitoring Styles */
+.failed-subtask-item {
+  border-left: 4px solid #dc3545;
+  transition: all 0.2s ease;
+}
+
+.failed-subtask-item:hover {
+  background-color: #f8f9fa;
+  transform: translateX(2px);
+}
+
+.subtask-error-preview {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.85em;
+  color: #6c757d;
+  max-height: 2.4em;
+  overflow: hidden;
+  line-height: 1.2;
+}
+
+.json-viewer {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 0.375rem;
+}
+
+.json-viewer pre {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.failure-summary-badge {
+  font-size: 0.7rem;
+  padding: 0.25rem 0.5rem;
+}
+
+.subtask-details-card {
+  border: 1px solid #dee2e6;
+  border-radius: 0.5rem;
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.subtask-details-card .card-header {
+  background-color: #f1f3f4;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.error-details-table {
+  font-size: 0.9rem;
+}
+
+.error-details-table td {
+  padding: 0.5rem;
+  border: none;
+}
+
+.error-details-table .fw-bold {
+  color: #495057;
+  min-width: 120px;
+}
+
+.traceback-container {
+  background: #2d3748;
+  color: #e2e8f0;
+  border-radius: 0.5rem;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.expand-collapse-btn {
+  transition: all 0.2s ease;
+  border: 1px solid #dee2e6;
+}
+
+.expand-collapse-btn:hover {
+  background-color: #e9ecef;
+  border-color: #adb5bd;
+}
+
+.failure-pattern-badge {
+  font-size: 0.75rem;
+  margin: 0.125rem;
+}
+
+.subtask-status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 0.5rem;
+}
+
+.subtask-status-indicator.failed {
+  background-color: #dc3545;
+}
+
+.subtask-status-indicator.retry {
+  background-color: #ffc107;
+}
+
+.task-hierarchy-depth-indicator {
+  border-left: 2px solid #dee2e6;
+  padding-left: 1rem;
+  margin-left: 0.5rem;
+}
+
+/* Animation for collapsing/expanding details */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.subtask-details-expanding {
+  animation: slideDown 0.3s ease;
+}
+
+/* Responsive design for mobile */
+@media (max-width: 768px) {
+  .failed-subtask-item {
+    border-left-width: 2px;
+  }
+  
+  .subtask-error-preview {
+    font-size: 0.8em;
+  }
+  
+  .json-viewer pre {
+    font-size: 0.7rem;
+  }
+  
+  .traceback-container {
+    font-size: 0.7rem;
+  }
+}
+
+/* Print styles for failure reports */
+@media print {
+  .expand-collapse-btn {
+    display: none;
+  }
+  
+  .collapse {
+    display: block !important;
+    height: auto !important;
+  }
+  
+  .failed-subtask-item {
+    page-break-inside: avoid;
+    border: 1px solid #000;
+    margin-bottom: 1rem;
+  }
+}

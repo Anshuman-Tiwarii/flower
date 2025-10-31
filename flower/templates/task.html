@@ -18,72 +18,177 @@
                 <button class="btn btn-danger float-end" id="task-revoke">Revoke</button>
             {% end %}
           </h2>
+          <!-- Enhanced Status Badge -->
+          <div class="mb-3">
+            {% if task.state == "SUCCESS" %}
+            <span class="badge bg-success fs-6">{{ task.state }}</span>
+            {% elif task.state == "FAILURE" %}
+            <span class="badge bg-danger fs-6">{{ task.state }}</span>
+            {% elif task.state == "STARTED" %}
+            <span class="badge bg-primary fs-6">{{ task.state }}</span>
+            {% else %}
+            <span class="badge bg-secondary fs-6">{{ task.state }}</span>
+            {% end %}
+          </div>
         </div>
-        <div class="row-fluid">
-          <div class="col-lg-6">
-            <table class="table table-bordered table-striped">
-              <tbody>
-              <tr>
-                <td>Name</td>
-                <td>{{ getattr(task, 'name', None) }}</td>
-              </tr>
-              <tr>
-                <td>UUID</td>
-                <td>{{ task.uuid }}</td>
-              </tr>
-              <tr>
-                <td>State</td>
-                <td>
-                  {% if task.state == "SUCCESS" %}
-                  <span class="badge bg-success">{{ task.state }}</span>
-                  {% elif task.state == "FAILURE" %}
-                  <span class="badge bg-danger">{{ task.state }}</span>
-                  {% else %}
-                  <span class="badge bg-secondary">{{ task.state }}</span>
-                  {% end %}
-                </td>
-              </tr>
-              <tr>
-                <td>args</td>
-                <td>{{ task.args }}</td>
-              </tr>
-              <tr>
-                <td>kwargs</td>
-                <td>{{ task.kwargs }}</td>
-              </tr>
-              <tr>
-                <td>Result</td>
-                <td>{{ getattr(task, 'result', '') }}</td>
-              </tr>
-              {% for name in task._fields %}
-                {% if name not in ['name', 'uuid', 'state', 'args', 'kwargs', 'result'] and getattr(task, name, None) is not None %}
-                <tr>
-                  <td>{{ humanize(name) }}</td>
-                  <td>
-                    {% if name in ['sent', 'received', 'started', 'succeeded', 'retried', 'timestamp', 'failed', 'revoked'] %}
-                    {{ humanize(getattr(task, name, None), type='time') }}
-                    {% elif name == 'worker' %}
-                    <a
-                        href="{{ reverse_url('worker', task.worker.hostname) }}">{{ task.worker.hostname }}</a>
-                    {% elif name == 'traceback' %}
-                    <pre>{{ getattr(task, name, None) }}</pre>
-                    {% elif name in ['parent_id', 'root_id'] %}
-                    <a
-                        href="{{ reverse_url('task', getattr(task, name, None)) }}">{{ getattr(task, name, None) }}</a>
-                    {% elif name == 'children' %}
-                      {% for child in getattr(task, name, {}) %}
-                        <a href="{{ reverse_url('task', child.id) }}">{{ child.id }}</a>
-                        <br>
+        
+        <!-- Enhanced Navigation Tabs -->
+        <nav class="nav nav-tabs" id="task-tabs">
+          <a class="nav-link active" data-bs-toggle="tab" href="#overview" id="overview-tab">Overview</a>
+          <a class="nav-link" data-bs-toggle="tab" href="#progress" id="progress-tab">Progress</a>
+          <a class="nav-link" data-bs-toggle="tab" href="#hierarchy" id="hierarchy-tab">Hierarchy</a>
+          <a class="nav-link" data-bs-toggle="tab" href="#failure-analysis" id="failure-tab">Failure Analysis</a>
+        </nav>
+        
+        <!-- Tab Content -->
+        <div class="tab-content mt-3">
+          <!-- Overview Tab (Original Content) -->
+          <div class="tab-pane active" id="overview">
+            <div class="row">
+              <div class="col-lg-6">
+                <table class="table table-bordered table-striped">
+                  <tbody>
+                  <tr>
+                    <td>Name</td>
+                    <td>{{ getattr(task, 'name', None) }}</td>
+                  </tr>
+                  <tr>
+                    <td>UUID</td>
+                    <td>{{ task.uuid }}</td>
+                  </tr>
+                  <tr>
+                    <td>State</td>
+                    <td>
+                      {% if task.state == "SUCCESS" %}
+                      <span class="badge bg-success">{{ task.state }}</span>
+                      {% elif task.state == "FAILURE" %}
+                      <span class="badge bg-danger">{{ task.state }}</span>
+                      {% else %}
+                      <span class="badge bg-secondary">{{ task.state }}</span>
                       {% end %}
-                    {% else %}
-                      {{ getattr(task, name, None) }}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>args</td>
+                    <td>{{ task.args }}</td>
+                  </tr>
+                  <tr>
+                    <td>kwargs</td>
+                    <td>{{ task.kwargs }}</td>
+                  </tr>
+                  <tr>
+                    <td>Result</td>
+                    <td>{{ getattr(task, 'result', '') }}</td>
+                  </tr>
+                  {% for name in task._fields %}
+                    {% if name not in ['name', 'uuid', 'state', 'args', 'kwargs', 'result'] and getattr(task, name, None) is not None %}
+                    <tr>
+                      <td>{{ humanize(name) }}</td>
+                      <td>
+                        {% if name in ['sent', 'received', 'started', 'succeeded', 'retried', 'timestamp', 'failed', 'revoked'] %}
+                        {{ humanize(getattr(task, name, None), type='time') }}
+                        {% elif name == 'worker' %}
+                        <a href="{{ reverse_url('worker', task.worker.hostname) }}">{{ task.worker.hostname }}</a>
+                        {% elif name == 'traceback' %}
+                        <pre>{{ getattr(task, name, None) }}</pre>
+                        {% elif name in ['parent_id', 'root_id'] %}
+                        <a href="{{ reverse_url('task', getattr(task, name, None)) }}">{{ getattr(task, name, None) }}</a>
+                        {% elif name == 'children' %}
+                          {% for child in getattr(task, name, {}) %}
+                            <a href="{{ reverse_url('task', child.id) }}">{{ child.id }}</a>
+                            <br>
+                          {% end %}
+                        {% else %}
+                          {{ getattr(task, name, None) }}
+                        {% end %}
+                      </td>
+                    </tr>
                     {% end %}
-                  </td>
-                </tr>
-                {% end %}
-              {% end %}
-              </tbody>
-            </table>
+                  {% end %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Progress Tab -->
+          <div class="tab-pane" id="progress">
+            <div class="row">
+              <div class="col-lg-8">
+                <div class="card">
+                  <div class="card-header">
+                    <h5>Task Progress Tracking</h5>
+                  </div>
+                  <div class="card-body">
+                    <div id="progress-container">
+                      <div class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                          <span class="visually-hidden">Loading progress data...</span>
+                        </div>
+                        <p class="mt-2">Loading progress information...</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-lg-4">
+                <div class="card">
+                  <div class="card-header">
+                    <h5>Subtask Summary</h5>
+                  </div>
+                  <div class="card-body">
+                    <div id="subtask-summary-container">
+                      <p class="text-muted">No subtask data available</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+  
+          </div>
+          
+          <!-- Hierarchy Tab -->
+          <div class="tab-pane" id="hierarchy">
+            <div class="card">
+              <div class="card-header">
+                <h5>Task Hierarchy Visualization</h5>
+                <small class="text-muted">Interactive visualization of task relationships and dependencies</small>
+              </div>
+              <div class="card-body">
+                <div id="hierarchy-container" style="height: 500px;">
+                  <div class="text-center">
+                    <div class="spinner-border text-primary" role="status">
+                      <span class="visually-hidden">Loading hierarchy data...</span>
+                    </div>
+                    <p class="mt-2">Loading task hierarchy...</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Failure Analysis Tab -->
+          <div class="tab-pane" id="failure-analysis">
+            <div class="row">
+              <div class="col-lg-12">
+                <div class="card">
+                  <div class="card-header">
+                    <h5><i class="fas fa-search"></i> Comprehensive Failure Analysis</h5>
+                    <small class="text-muted">Detailed analysis of task failures including subtask hierarchy</small>
+                  </div>
+                  <div class="card-body">
+                    <div id="failure-analysis-container">
+                      <div class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                          <span class="visually-hidden">Loading failure analysis...</span>
+                        </div>
+                        <p class="mt-2">Analyzing failure data...</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
